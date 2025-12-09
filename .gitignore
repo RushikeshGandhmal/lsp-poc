@@ -1,0 +1,34 @@
+# Node modules
+node_modules/
+
+# Compiled output
+out/
+*.js
+*.js.map
+
+# VS Code
+.vscode-test/
+*.vsix
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Exclude compiled test files
+test-sample.js
+test-sample.js.map
+
+# Keep source files
+!src/**/*.js
+

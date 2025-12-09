@@ -1,0 +1,162 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    HOW TO TEST THE POC (Visual Guide)                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+
+CURRENT SETUP (POC Testing with Postman):
+═══════════════════════════════════════════════════════════════════════════════
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │                    Your VS Code                             │
+    │  ┌───────────────────────────────────────────────────────┐  │
+    │  │  Press F5 → Opens Extension Development Host          │  │
+    │  └───────────────────────────────────────────────────────┘  │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │          Extension Development Host Window                  │
+    │  ┌───────────────────────────────────────────────────────┐  │
+    │  │  1. Extension activates                               │  │
+    │  │  2. HTTP server starts on port 3000                   │  │
+    │  │  3. Notification: "Forge LSP API running on port 3000"│  │
+    │  │  4. Open test-sample.ts (or any file)                 │  │
+    │  │  5. TypeScript language server activates              │  │
+    │  └───────────────────────────────────────────────────────┘  │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              │ HTTP Server listening on
+                              │ http://localhost:3000
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │                        Postman                              │
+    │  ┌───────────────────────────────────────────────────────┐  │
+    │  │  POST http://localhost:3000/api/textDocument/references│ │
+    │  │                                                         │  │
+    │  │  Body:                                                  │  │
+    │  │  {                                                      │  │
+    │  │    "uri": "file:///d:/path/to/file.ts",                │  │
+    │  │    "position": { "line": 3, "character": 9 }           │  │
+    │  │  }                                                      │  │
+    │  └───────────────────────────────────────────────────────┘  │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              │ HTTP Request
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │              VS Code Extension (src/extension.ts)           │
+    │  ┌───────────────────────────────────────────────────────┐  │
+    │  │  1. Receives HTTP request                             │  │
+    │  │  2. Parses URI and position                           │  │
+    │  │  3. Calls: vscode.executeReferenceProvider()          │  │
+    │  └───────────────────────────────────────────────────────┘  │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              │ Internal VS Code API call
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │              VS Code Language Server                        │
+    │  ┌───────────────────────────────────────────────────────┐  │
+    │  │  TypeScript/Python/Rust/Go Language Server            │  │
+    │  │  - Analyzes the code                                  │  │
+    │  │  - Finds all references to the symbol                 │  │
+    │  │  - Returns locations                                  │  │
+    │  └───────────────────────────────────────────────────────┘  │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              │ Returns locations
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │              VS Code Extension (src/extension.ts)           │
+    │  ┌───────────────────────────────────────────────────────┐  │
+    │  │  1. Receives locations from language server           │  │
+    │  │  2. Converts to JSON format                           │  │
+    │  │  3. Sends HTTP response                               │  │
+    │  └───────────────────────────────────────────────────────┘  │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              │ HTTP Response
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │                        Postman                              │
+    │  ┌───────────────────────────────────────────────────────┐  │
+    │  │  Response:                                              │  │
+    │  │  {                                                      │  │
+    │  │    "references": [                                      │  │
+    │  │      {                                                  │  │
+    │  │        "uri": "file:///d:/path/to/file.ts",            │  │
+    │  │        "range": {                                       │  │
+    │  │          "start": { "line": 3, "character": 9 },       │  │
+    │  │          "end": { "line": 3, "character": 18 }         │  │
+    │  │        }                                                │  │
+    │  │      },                                                 │  │
+    │  │      ... more references ...                            │  │
+    │  │    ]                                                    │  │
+    │  │  }                                                      │  │
+    │  └───────────────────────────────────────────────────────┘  │
+    └─────────────────────────────────────────────────────────────┘
+
+
+FUTURE SETUP (Production with Forge):
+═══════════════════════════════════════════════════════════════════════════════
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │                    VS Code (User's IDE)                     │
+    │  - Extension auto-starts                                    │
+    │  - HTTP server on port 3000                                 │
+    │  - User works normally                                      │
+    └─────────────────────────────────────────────────────────────┘
+                              │
+                              │ HTTP Server listening
+                              │
+                              ▼
+    ┌─────────────────────────────────────────────────────────────┐
+    │              Forge CLI (Terminal Session 1)                 │
+    │  ┌───────────────────────────────────────────────────────┐  │
+    │  │  User: "Where is createServer used?"                  │  │
+    │  │  Forge: Sends HTTP request to localhost:3000          │  │
+    │  │  Forge: Receives references                            │  │
+    │  │  Forge: "createServer is used in app.ts and index.ts" │  │
+    │  └───────────────────────────────────────────────────────┘  │
+    └─────────────────────────────────────────────────────────────┘
+
+    ┌─────────────────────────────────────────────────────────────┐
+    │              Forge CLI (Terminal Session 2)                 │
+    │  - Also connects to localhost:3000                          │
+    │  - Multiple sessions can run simultaneously                 │
+    └─────────────────────────────────────────────────────────────┘
+
+
+KEY INSIGHT:
+═══════════════════════════════════════════════════════════════════════════════
+
+  Postman (POC) = Forge CLI (Production)
+
+  Both do the same thing:
+  1. Send HTTP POST request with file URI + position
+  2. Receive JSON response with references
+  3. Use the data
+
+  The ONLY difference:
+  - Postman: You manually type the request
+  - Forge: AI automatically generates the request
+
+
+WHAT YOU'RE TESTING:
+═══════════════════════════════════════════════════════════════════════════════
+
+✅ Can VS Code expose LSP features via HTTP?          → YES
+✅ Can external tools query code intelligence?        → YES
+✅ Does it work with different languages?             → YES
+✅ Can multiple clients connect?                      → YES
+✅ Is the API simple enough for Forge to use?         → YES
+
+
+THIS IS A REAL WORKING PROTOTYPE!
+═══════════════════════════════════════════════════════════════════════════════
+

@@ -1,0 +1,157 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                         LSP POC - QUICK START                                ║
+║                    Testing with Postman (Simulating Forge)                   ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+🎯 GOAL: Test the LSP API using Postman (simulating what Forge will do)
+
+
+📋 WHAT YOU NEED:
+────────────────────────────────────────────────────────────────────────────────
+✅ VS Code (already have it)
+✅ This workspace (already open)
+✅ Postman (download from postman.com if you don't have it)
+
+
+🚀 3-STEP QUICK START:
+────────────────────────────────────────────────────────────────────────────────
+
+STEP 1: Start the Extension
+────────────────────────────────────────────────────────────────────────────────
+1. Press F5 in VS Code
+2. A new window opens (Extension Development Host)
+3. Wait for notification: "Forge LSP API running on port 3000" ✅
+
+
+STEP 2: Open a File to Test
+────────────────────────────────────────────────────────────────────────────────
+In the Extension Development Host window:
+1. Open test-sample.ts (or any TypeScript/Python/Rust file)
+2. Click on the word "greetUser" (line 4)
+3. Note: VS Code shows "Ln 4, Col 10" (we'll use this in Postman)
+
+
+STEP 3: Test with Postman
+────────────────────────────────────────────────────────────────────────────────
+1. Open Postman
+2. Import the collection: LSP-API.postman_collection.json
+3. Run "Health Check" request → Should return status: "ok"
+4. Run "Find References - test-sample.ts" → Should return ~7 references
+5. Done! ✅
+
+
+📖 DETAILED GUIDES:
+────────────────────────────────────────────────────────────────────────────────
+→ POSTMAN-GUIDE.txt    - Complete Postman testing guide
+→ README.md            - Full API documentation
+→ TESTING.md           - Detailed testing scenarios
+
+
+🔧 HELPER TOOLS:
+────────────────────────────────────────────────────────────────────────────────
+→ get-file-uri.ps1                    - Convert file paths to URI format
+→ test-api.ps1                        - Automated test script
+→ LSP-API.postman_collection.json    - Import into Postman
+
+
+💡 TESTING WITH YOUR OWN FILES:
+────────────────────────────────────────────────────────────────────────────────
+
+1. Open your file in Extension Development Host
+   Example: D:\MyProject\src\app.ts
+
+2. Get the URI format:
+   Run: .\get-file-uri.ps1 "D:\MyProject\src\app.ts"
+   Output: file:///D:/MyProject/src/app.ts
+
+3. Click on a function/variable, note position
+   Example: VS Code shows "Ln 15, Col 10"
+   Convert: line: 14, character: 9 (0-indexed!)
+
+4. In Postman, POST to http://localhost:3000/api/textDocument/references
+   Body:
+   {
+     "uri": "file:///D:/MyProject/src/app.ts",
+     "position": { "line": 14, "character": 9 }
+   }
+
+5. Get references! 🎉
+
+
+🎬 DEMO FOR TEAM LEAD:
+────────────────────────────────────────────────────────────────────────────────
+
+1. Show the code (src/extension.ts) - only ~120 lines
+2. Press F5 → Extension starts
+3. Open test-sample.ts
+4. Open Postman → Send request
+5. Show response with all references
+6. Explain: "This is exactly what Forge will do, but from Rust"
+
+
+🔍 WHAT THIS PROVES:
+────────────────────────────────────────────────────────────────────────────────
+
+✅ VS Code can expose LSP features via HTTP
+✅ External tools can query code intelligence
+✅ Works with ANY language (TypeScript, Python, Rust, Go, etc.)
+✅ Multiple clients can connect (multiple Forge sessions)
+✅ Simple HTTP REST API (easy to integrate from Rust)
+
+
+🌟 THIS IS THE REAL WORLD SCENARIO:
+────────────────────────────────────────────────────────────────────────────────
+
+Current POC:
+  Postman → HTTP Request → VS Code Extension → Language Server → Response
+
+Future with Forge:
+  Forge CLI → HTTP Request → VS Code Extension → Language Server → Response
+
+The flow is IDENTICAL! Postman is just simulating what Forge will do.
+
+
+📝 QUICK REFERENCE:
+────────────────────────────────────────────────────────────────────────────────
+
+API Endpoints:
+  GET  http://localhost:3000/api/health
+  POST http://localhost:3000/api/textDocument/references
+
+Position Format:
+  VS Code: Ln 4, Col 10  →  API: line: 3, character: 9 (0-indexed)
+
+URI Format:
+  Windows: D:\path\to\file.ts  →  API: file:///D:/path/to/file.ts
+
+
+❓ TROUBLESHOOTING:
+────────────────────────────────────────────────────────────────────────────────
+
+Problem: Connection refused
+Solution: Make sure Extension Development Host is running (F5)
+
+Problem: Empty references
+Solution: File must be OPEN in Extension Development Host
+
+Problem: Wrong line numbers
+Solution: Remember 0-indexed! VS Code Ln 4 = API line: 3
+
+
+🎯 NEXT STEPS AFTER POC:
+────────────────────────────────────────────────────────────────────────────────
+
+1. Show to team lead
+2. Get approval
+3. Add more LSP features (definition, hover, symbols, diagnostics)
+4. Add authentication
+5. Forge team implements HTTP client in Rust
+6. Integration complete! 🚀
+
+
+═══════════════════════════════════════════════════════════════════════════════
+
+Ready to test? Press F5 and open Postman! 🎉
+
+═══════════════════════════════════════════════════════════════════════════════
+
