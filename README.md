@@ -1,31 +1,22 @@
 # LSP POC - Forge API
 
-A proof-of-concept VS Code extension that exposes LSP features via HTTP REST API for Forge to consume.
+A proof-of-concept VS Code extension that exposes LSP features via Named Pipes for Forge to consume.
 
 ## What This Does
 
 This extension:
-- Starts an HTTP server on port 3000 when VS Code activates
-- Exposes VS Code's language server features via REST API
-- Allows external tools (like Forge) to query code intelligence features
+- Starts a Named Pipe server when VS Code activates
+- Exposes VS Code's language server features via JSON-RPC over Named Pipes
+- Allows external tools (like Forge CLI) to query code intelligence features
+- Uses workspace-specific pipe names for multi-workspace support
 
 ## Features Implemented
 
 ### 1. Health Check
-```bash
-GET http://localhost:3000/api/health
-```
+Returns workspace information and server status.
 
 ### 2. Find References
-```bash
-POST http://localhost:3000/api/textDocument/references
-Content-Type: application/json
-
-{
-  "uri": "file:///path/to/file.ts",
-  "position": { "line": 10, "character": 5 }
-}
-```
+Finds all references to a symbol by name across the workspace.
 
 ## Setup Instructions
 
@@ -42,80 +33,30 @@ npm run compile
 ### 3. Run the Extension
 1. Press `F5` in VS Code to open Extension Development Host
 2. The extension will activate automatically
-3. You should see a notification: "Forge LSP API running on port 3000"
+3. You should see a notification with the pipe name (e.g., "Forge LSP API: forge-lsp-9d93fdde")
 
 ### 4. Test the API
 
-#### Option A: Using curl (PowerShell)
-```powershell
-# Health check
-curl http://localhost:3000/api/health
+Run the test client from the workspace directory:
 
-# Find references
-curl -X POST http://localhost:3000/api/textDocument/references `
-  -H "Content-Type: application/json" `
-  -d '{\"uri\":\"file:///d:/Company/Company/Tailcall/vscode/lsp-poc/test-sample.ts\",\"position\":{\"line\":3,\"character\":9}}'
-```
-
-#### Option B: Using the test script (Git Bash)
 ```bash
-chmod +x test-api.sh
-./test-api.sh
+node test-client-standalone.js <symbolName>
 ```
 
-#### Option C: Using Postman/Insomnia
-Import the following request:
-- **URL:** `http://localhost:3000/api/textDocument/references`
-- **Method:** POST
-- **Headers:** `Content-Type: application/json`
-- **Body:**
-```json
-{
-  "uri": "file:///d:/Company/Company/Tailcall/vscode/lsp-poc/test-sample.ts",
-  "position": { "line": 3, "character": 9 }
-}
+**Examples:**
+```bash
+# Find references to a symbol in your workspace
+node test-client-standalone.js FormControl
+node test-client-standalone.js MyComponent
+node test-client-standalone.js useState
 ```
 
-## Testing with test-sample.ts
-
-The `test-sample.ts` file contains a function `greetUser` that is used in multiple places.
-
-To find all references to `greetUser`:
-- Function definition is at line 3 (0-indexed: line 3, character 9)
-- The API should return all locations where `greetUser` is used
-
-## Expected Response
-
-```json
-{
-  "references": [
-    {
-      "uri": "file:///d:/Company/Company/Tailcall/vscode/lsp-poc/test-sample.ts",
-      "range": {
-        "start": { "line": 3, "character": 9 },
-        "end": { "line": 3, "character": 18 }
-      }
-    },
-    {
-      "uri": "file:///d:/Company/Company/Tailcall/vscode/lsp-poc/test-sample.ts",
-      "range": {
-        "start": { "line": 8, "character": 18 },
-        "end": { "line": 8, "character": 27 }
-      }
-    }
-    // ... more references
-  ]
-}
-```
-
-## Configuration
-
-You can change the port in VS Code settings:
-```json
-{
-  "lspPoc.port": 3000
-}
-```
+The test client will:
+1. Generate the pipe name based on the current workspace
+2. Connect to the VS Code extension via Named Pipe
+3. Send a health check request
+4. Send a find references request for the specified symbol
+5. Display the results
 
 ## Architecture
 
@@ -123,11 +64,11 @@ You can change the port in VS Code settings:
 ┌─────────────────────────────────────┐
 │      VS Code Extension              │
 │  ┌───────────────────────────────┐  │
-│  │  HTTP Server (Express)        │  │
-│  │  Port: 3000                   │  │
+│  │  Named Pipe Server            │  │
+│  │  \\.\pipe\forge-lsp-{hash}    │  │
 │  └───────────────────────────────┘  │
 │              ▲                       │
-│              │ Proxies to            │
+│              │ JSON-RPC              │
 │              ▼                       │
 │  ┌───────────────────────────────┐  │
 │  │  VS Code Language Features    │  │
@@ -135,13 +76,36 @@ You can change the port in VS Code settings:
 │  └───────────────────────────────┘  │
 └─────────────────────────────────────┘
               ▲
-              │ HTTP Requests
+              │ Named Pipe (IPC)
               │
 ┌─────────────┴───────────────────────┐
-│         Forge CLI                    │
-│  (or any HTTP client)                │
+│         Forge CLI (Rust)             │
+│  Connects to workspace-specific pipe │
 └──────────────────────────────────────┘
 ```
+
+## How It Works
+
+### Workspace-Specific Pipe Names
+
+Each workspace gets a unique pipe name based on its path:
+
+1. **Extension generates pipe name:**
+   - Takes workspace path: `D:\Projects\my-app`
+   - Normalizes to lowercase (Windows): `d:\projects\my-app`
+   - Generates MD5 hash: `a1b2c3d4...`
+   - Creates pipe: `\\.\pipe\forge-lsp-a1b2c3d4`
+
+2. **Forge CLI generates same pipe name:**
+   - Detects current directory: `D:\Projects\my-app`
+   - Normalizes to lowercase: `d:\projects\my-app`
+   - Generates same MD5 hash: `a1b2c3d4...`
+   - Connects to: `\\.\pipe\forge-lsp-a1b2c3d4`
+
+3. **Communication:**
+   - Both processes connect to the same pipe
+   - JSON-RPC messages flow through the pipe
+   - Multiple workspaces can run simultaneously without conflicts
 
 ## Next Steps for Full Implementation
 
@@ -150,45 +114,107 @@ You can change the port in VS Code settings:
    - `workspace/symbol` - Find symbols
    - `textDocument/hover` - Hover information
    - `textDocument/diagnostics` - Errors/warnings
+   - `textDocument/completion` - Code completion
 
-2. Add authentication (API key/token)
+2. Add error handling and validation
 
-3. Add CORS support for remote access
+3. Add request logging (optional)
 
-4. Add request logging and error handling
-
-5. Support multiple workspaces
+4. Performance optimization for large workspaces
 
 ## For Forge Team
 
 To integrate this into Forge (Rust), you'll need to:
 
-1. Add HTTP client (using `reqwest` crate)
-2. Detect VS Code server:
+### 1. Add Named Pipe Client
+
+Use a Rust crate for named pipes (e.g., `named-pipe` or `tokio-named-pipes`):
+
 ```rust
-async fn detect_vscode() -> Option<String> {
-    let client = reqwest::Client::new();
-    let response = client.get("http://localhost:3000/api/health").send().await.ok()?;
-    if response.status().is_success() {
-        Some("http://localhost:3000".to_string())
-    } else {
-        None
-    }
+use std::env;
+use md5;
+
+fn generate_pipe_name() -> String {
+    let workspace_path = env::current_dir()
+        .unwrap()
+        .to_string_lossy()
+        .to_lowercase();
+
+    let hash = format!("{:x}", md5::compute(workspace_path));
+    let hash_short = &hash[..8];
+
+    #[cfg(windows)]
+    return format!(r"\\.\pipe\forge-lsp-{}", hash_short);
+
+    #[cfg(unix)]
+    return format!("/tmp/forge-lsp-{}.sock", hash_short);
 }
 ```
 
-3. Call the API:
+### 2. Connect to Named Pipe
+
 ```rust
-async fn find_references(uri: &str, line: u32, character: u32) -> Vec<Reference> {
-    let client = reqwest::Client::new();
-    let response = client.post("http://localhost:3000/api/textDocument/references")
-        .json(&json!({
-            "uri": uri,
-            "position": { "line": line, "character": character }
-        }))
-        .send()
-        .await?;
-    response.json().await?
+use std::io::{Read, Write};
+
+fn connect_to_vscode() -> Result<NamedPipeClient> {
+    let pipe_name = generate_pipe_name();
+    let client = NamedPipeClient::connect(&pipe_name)?;
+    Ok(client)
+}
+```
+
+### 3. Send JSON-RPC Requests
+
+```rust
+use serde_json::json;
+
+fn find_references(symbol_name: &str) -> Result<Vec<Reference>> {
+    let mut client = connect_to_vscode()?;
+
+    let request = json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "findReferences",
+        "params": {
+            "symbolName": symbol_name
+        }
+    });
+
+    let request_str = serde_json::to_string(&request)?;
+    let message = format!(
+        "Content-Length: {}\r\n\r\n{}",
+        request_str.len(),
+        request_str
+    );
+
+    client.write_all(message.as_bytes())?;
+
+    // Read response (parse Content-Length header, then JSON)
+    let response = read_jsonrpc_response(&mut client)?;
+
+    Ok(response.result.references)
+}
+```
+
+### 4. Example Usage in Forge CLI
+
+```rust
+// In your Forge CLI command
+fn main() {
+    let symbol_name = "MyComponent";
+
+    match find_references(symbol_name) {
+        Ok(refs) => {
+            println!("Found {} references:", refs.len());
+            for ref in refs {
+                println!("  {}:{}:{}", ref.uri, ref.range.start.line, ref.range.start.character);
+            }
+        }
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            eprintln!("Make sure VS Code is open with the Forge LSP extension running.");
+        }
+    }
 }
 ```
 

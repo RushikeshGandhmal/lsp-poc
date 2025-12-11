@@ -3,7 +3,6 @@ node_modules/
 
 # Compiled output
 out/
-*.js
 *.js.map
 
 # VS Code
