@@ -1,0 +1,79 @@
+{
+  "symbol": {
+    "name": "placeholder",
+    "uri": "file:///d:/Company/Company/Tailcall/vscode/lsp-poc/components/CustomeFormField.tsx",
+    "position": {
+      "line": 28,
+      "character": 20
+    }
+  },
+  "references": [
+    {
+      "uri": "file:///d:/Full%20Stack%20Javascript%20Development/Nextjs%20Projects/carepulse/components/CustomeFormField.tsx",
+      "range": {
+        "start": {
+          "line": 28,
+          "character": 20
+        },
+        "end": {
+          "line": 28,
+          "character": 31
+        }
+      }
+    },
+    {
+      "uri": "file:///d:/Full%20Stack%20Javascript%20Development/Nextjs%20Projects/carepulse/components/CustomeFormField.tsx",
+      "range": {
+        "start": {
+          "line": 42,
+          "character": 39
+        },
+        "end": {
+          "line": 42,
+          "character": 50
+        }
+      }
+    },
+    {
+      "uri": "file:///d:/Full%20Stack%20Javascript%20Development/Nextjs%20Projects/carepulse/components/forms/PatientForm.tsx",
+      "range": {
+        "start": {
+          "line": 27,
+          "character": 10
+        },
+        "end": {
+          "line": 27,
+          "character": 21
+        }
+      }
+    },
+    {
+      "uri": "file:///d:/Full%20Stack%20Javascript%20Development/Nextjs%20Projects/carepulse/components/forms/PatientForm.tsx",
+      "range": {
+        "start": {
+          "line": 81,
+          "character": 10
+        },
+        "end": {
+          "line": 81,
+          "character": 21
+        }
+      }
+    },
+    {
+      "uri": "file:///d:/Full%20Stack%20Javascript%20Development/Nextjs%20Projects/carepulse/components/forms/PatientForm.tsx",
+      "range": {
+        "start": {
+          "line": 91,
+          "character": 10
+        },
+        "end": {
+          "line": 91,
+          "character": 21
+        }
+      }
+    }
+  ],
+  "totalReferences": 5
+}
+

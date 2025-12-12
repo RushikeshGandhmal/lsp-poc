@@ -104,132 +104,90 @@ function startNamedPipeServer() {
 }
 
 async function handleFindReferences(symbolName: string): Promise<any> {
-    try {
-        if (!symbolName) {
-            throw new Error('Missing required field: symbolName');
-        }
+    if (!symbolName) {
+        throw new Error('Missing required field: symbolName');
+    }
 
-        // STEP 1: Try to find the symbol in the workspace first
-        const symbols = await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
-            'vscode.executeWorkspaceSymbolProvider',
-            symbolName
-        );
+    // STEP 1: Find the symbol location
+    const symbolLocation = await findSymbolLocation(symbolName);
 
-        let symbolLocation: { uri: vscode.Uri; position: vscode.Position } | null = null;
+    if (!symbolLocation) {
+        throw new Error(`No symbol named "${symbolName}" found in the workspace`);
+    }
 
-        // Find exact match only (strict case-sensitive matching)
-        if (symbols && symbols.length > 0) {
-            const symbol = symbols.find(s => s.name === symbolName);
-            if (symbol) {
-                symbolLocation = {
-                    uri: symbol.location.uri,
-                    position: symbol.location.range.start
-                };
+    // STEP 2: Get all references using VS Code's LSP
+    const references = await vscode.commands.executeCommand<vscode.Location[]>(
+        'vscode.executeReferenceProvider',
+        symbolLocation.uri,
+        symbolLocation.position
+    );
+
+    // STEP 3: Return the results
+    return {
+        symbol: {
+            name: symbolName,
+            uri: symbolLocation.uri.toString(),
+            position: {
+                line: symbolLocation.position.line,
+                character: symbolLocation.position.character
             }
-        }
-
-        // STEP 2: If not found in workspace, search in all text documents (including imports from node_modules)
-        if (!symbolLocation) {
-            symbolLocation = await findSymbolInDocuments(symbolName);
-        }
-
-        if (!symbolLocation) {
-            throw new Error(`No symbol named "${symbolName}" found in the workspace or open documents`);
-        }
-
-        // STEP 3: Get all references for this symbol
-        const references = await vscode.commands.executeCommand<vscode.Location[]>(
-            'vscode.executeReferenceProvider',
-            symbolLocation.uri,
-            symbolLocation.position
-        );
-
-        if (!references || references.length === 0) {
-            return {
-                symbol: {
-                    name: symbolName,
-                    uri: symbolLocation.uri.toString(),
-                    position: {
-                        line: symbolLocation.position.line,
-                        character: symbolLocation.position.character
-                    }
-                },
-                references: [],
-                message: 'Symbol found but no references'
-            };
-        }
-
-        // Convert locations to JSON-serializable format
-        const referencesData = references.map(loc => ({
+        },
+        references: (references || []).map(loc => ({
             uri: loc.uri.toString(),
             range: {
-                start: {
-                    line: loc.range.start.line,
-                    character: loc.range.start.character
-                },
-                end: {
-                    line: loc.range.end.line,
-                    character: loc.range.end.character
-                }
+                start: { line: loc.range.start.line, character: loc.range.start.character },
+                end: { line: loc.range.end.line, character: loc.range.end.character }
             }
-        }));
-
-        return {
-            symbol: {
-                name: symbolName,
-                uri: symbolLocation.uri.toString(),
-                position: {
-                    line: symbolLocation.position.line,
-                    character: symbolLocation.position.character
-                }
-            },
-            references: referencesData,
-            totalReferences: referencesData.length
-        };
-
-    } catch (error) {
-        throw error;
-    }
+        })),
+        totalReferences: references?.length || 0
+    };
 }
 
 /**
- * Search for a symbol in all text documents (including imports from node_modules)
+ * Find the location of a symbol in the workspace
+ * Tries workspace symbols first, then searches open documents
  */
-async function findSymbolInDocuments(symbolName: string): Promise<{ uri: vscode.Uri; position: vscode.Position } | null> {
-    // Get all text documents (including visible and recently opened)
-    const documents = vscode.workspace.textDocuments;
+async function findSymbolLocation(symbolName: string): Promise<{ uri: vscode.Uri; position: vscode.Position } | null> {
+    // Try workspace symbols first (fast path for workspace-defined symbols)
+    const symbols = await vscode.commands.executeCommand<vscode.SymbolInformation[]>(
+        'vscode.executeWorkspaceSymbolProvider',
+        symbolName
+    );
 
-    for (const document of documents) {
-        // Skip non-file schemes (like output, debug console, etc.)
-        if (document.uri.scheme !== 'file') {
-            continue;
-        }
+    const exactMatch = symbols?.find(s => s.name === symbolName);
+    if (exactMatch) {
+        return {
+            uri: exactMatch.location.uri,
+            position: exactMatch.location.range.start
+        };
+    }
 
-        // Get all symbols in this document
+    // Fallback: Search in open workspace documents only
+    for (const document of vscode.workspace.textDocuments) {
+        // Skip non-file schemes
+        if (document.uri.scheme !== 'file') continue;
+
+        // Only process files within workspace folders (automatically excludes node_modules, etc.)
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(document.uri);
+        if (!workspaceFolder) continue;
+
         const documentSymbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
             'vscode.executeDocumentSymbolProvider',
             document.uri
         );
 
-        if (documentSymbols) {
-            const found = findSymbolInTree(documentSymbols, symbolName);
-            if (found) {
-                return {
-                    uri: document.uri,
-                    position: found.range.start
-                };
-            }
+        const found = findSymbolInTree(documentSymbols || [], symbolName);
+        if (found) {
+            return { uri: document.uri, position: found.range.start };
         }
 
-        // Also search in the text directly (for imports and other references)
+        // Search text for imports (only in workspace files)
         const text = document.getText();
-        const regex = new RegExp(`\\b${escapeRegExp(symbolName)}\\b`, 'g');
-        let match;
+        const regex = new RegExp(`\\b${escapeRegExp(symbolName)}\\b`);
+        const match = regex.exec(text);
 
-        while ((match = regex.exec(text)) !== null) {
+        if (match) {
             const position = document.positionAt(match.index);
-
-            // Verify this is actually the symbol we're looking for by checking hover info
             const hovers = await vscode.commands.executeCommand<vscode.Hover[]>(
                 'vscode.executeHoverProvider',
                 document.uri,
@@ -237,11 +195,7 @@ async function findSymbolInDocuments(symbolName: string): Promise<{ uri: vscode.
             );
 
             if (hovers && hovers.length > 0) {
-                // Found a valid symbol at this position
-                return {
-                    uri: document.uri,
-                    position: position
-                };
+                return { uri: document.uri, position };
             }
         }
     }

@@ -154,14 +154,21 @@ async function testConnection() {
             const refsResult = await client.sendRequest('findReferences', {
                 symbolName: symbolName
             });
+
+            // Write JSON to file
+            const fs = require('fs');
+            const outputFile = `references-${symbolName}.json`;
+            fs.writeFileSync(outputFile, JSON.stringify(refsResult, null, 2));
+
             console.log('Symbol:', refsResult.symbol.name);
-            console.log('Kind:', refsResult.symbol.kind);
+            console.log('Kind:', refsResult.symbol.kind || 'undefined');
             console.log('Total References:', refsResult.totalReferences);
             console.log('\nReferences:');
             refsResult.references.forEach((ref, index) => {
                 const uri = ref.uri.replace('file:///', '');
                 console.log(`  ${index + 1}. ${uri}:${ref.range.start.line}:${ref.range.start.character}`);
             });
+            console.log(`\n📄 Full JSON saved to: ${outputFile}`);
             console.log('✅ Find references passed!\n');
         } catch (error) {
             console.error('❌ Error:', error.message);
